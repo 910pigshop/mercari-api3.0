@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>910豬株式會社 報價系統</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding-bottom: 95px; }
+  </style>
+</head>
+<body class="p-4 md:p-8 max-w-4xl mx-auto">
+
+  <!-- ==================== 分頁一：煤爐報價計算 ==================== -->
+  <div id="tab1" class="tab-content">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 rounded-xl bg-red-500 flex items-center justify-center text-white font-bold text-xl">M</div>
+        <div>
+          <h1 class="text-xl font-bold text-slate-800">Mercari 報價助手</h1>
+          <p class="text-xs text-slate-500">日本/台灣代購即時抓取與計算</p>
+        </div>
+      </div>
+
+      <label class="block text-sm font-semibold text-slate-700 mb-2">直接貼上客人的對話訊息（自動識別台/日煤爐網址）</label>
+      <textarea id="urlInput" rows="5" class="w-full p-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 text-sm mb-4" placeholder="貼上含有網址的對話訊息..."></textarea>
+
+      <div class="flex gap-2">
+        <button onclick="fetchPrices()" id="fetchBtn" class="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl transition shadow-sm flex items-center justify-center gap-2">
+          <span>自動辨識網址並報價</span>
+        </button>
+        <button onclick="clearMercariTab()" class="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold rounded-xl transition flex items-center justify-center gap-1 text-xs whitespace-nowrap">
+          <span>🧹 清除內容</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 結果清單 -->
+    <div id="resultsList" class="space-y-4 mb-6"></div>
+
+    <!-- 報價總計與複製 -->
+    <div id="summaryCard" class="hidden bg-slate-900 text-white rounded-2xl p-6 shadow-lg mb-6">
+      <div class="flex justify-between items-end mb-4 border-b border-slate-800 pb-4">
+        <div>
+          <p class="text-xs text-slate-400">總計預估台幣 (已套用 0/5 進位)</p>
+          <p id="totalTwd" class="text-3xl font-extrabold text-emerald-400">NT$ 0</p>
+        </div>
+        <div class="text-right">
+          <p class="text-xs text-slate-400">日幣商品總額</p>
+          <p id="totalJpy" class="text-lg font-semibold">¥0</p>
+        </div>
+      </div>
+      <button onclick="copyQuote(1)" class="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold rounded-xl transition flex items-center justify-center gap-2 mb-4">
+        複製完整報價文字
+      </button>
+
+      <!-- 預覽框 (分頁一) -->
+      <div id="previewBox1" class="hidden border-t border-slate-800 pt-4 mt-2">
+        <p class="text-xs font-semibold text-slate-400 mb-2 flex items-center gap-1">📋 已複製的報價文字預覽：</p>
+        <pre id="previewText1" class="bg-slate-950 p-3.5 rounded-xl text-xs font-mono text-emerald-300 whitespace-pre-wrap break-all border border-slate-800 leading-relaxed"></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 分頁二：通用手輸報價 ==================== -->
+  <div id="tab2" class="tab-content hidden">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center text-white font-bold text-xl">✍️</div>
+          <div>
+            <h1 class="text-xl font-bold text-slate-800">通用手輸報價</h1>
+            <p class="text-xs text-slate-500">適用於煤爐以外的各式購物網站</p>
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="clearGeneralTab()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-xl transition flex items-center gap-1">
+            <span>🧹 清除全部</span>
+          </button>
+          <button onclick="addGeneralManualItem()" class="px-3.5 py-2 bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold rounded-xl transition flex items-center gap-1 shadow-sm">
+            <span>➕ 新增商品</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="generalManualList" class="space-y-4"></div>
+    </div>
+
+    <!-- 報價總計與複製 (通用手輸) -->
+    <div id="summaryCardGeneral" class="hidden bg-slate-900 text-white rounded-2xl p-6 shadow-lg mb-6">
+      <div class="flex justify-between items-end mb-4 border-b border-slate-800 pb-4">
+        <div>
+          <p class="text-xs text-slate-400">總計預估台幣 (已套用 0/5 進位)</p>
+          <p id="totalTwdGeneral" class="text-3xl font-extrabold text-emerald-400">NT$ 0</p>
+        </div>
+        <div class="text-right">
+          <p class="text-xs text-slate-400">日幣商品總額</p>
+          <p id="totalJpyGeneral" class="text-lg font-semibold">¥0</p>
+        </div>
+      </div>
+      <button onclick="copyQuote(2)" class="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold rounded-xl transition flex items-center justify-center gap-2 mb-4">
+        複製完整報價文字
+      </button>
+
+      <!-- 預覽框 (分頁二) -->
+      <div id="previewBox2" class="hidden border-t border-slate-800 pt-4 mt-2">
+        <p class="text-xs font-semibold text-slate-400 mb-2 flex items-center gap-1">📋 已複製的報價文字預覽：</p>
+        <pre id="previewText2" class="bg-slate-950 p-3.5 rounded-xl text-xs font-mono text-emerald-300 whitespace-pre-wrap break-all border border-slate-800 leading-relaxed"></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 分頁三：相卡報價 ==================== -->
+  <div id="tab3" class="tab-content hidden">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
+      <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-purple-500 flex items-center justify-center text-white font-bold text-xl">📷</div>
+          <div>
+            <h1 class="text-xl font-bold text-slate-800">相卡報價助手</h1>
+            <p class="text-xs text-slate-500">超商相卡/明信片/官方貼紙張數計算 (滿25/50張大宗折扣)</p>
+          </div>
+        </div>
+        <button onclick="resetPhotoCardCounts()" class="text-xs text-slate-500 hover:text-red-500 font-semibold underline">重置張數</button>
+      </div>
+
+      <!-- 相卡數量輸入清單 -->
+      <div id="photoCardGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+    </div>
+
+    <!-- 相卡報價總結 -->
+    <div id="summaryCardPhoto" class="bg-slate-900 text-white rounded-2xl p-6 shadow-lg mb-6">
+      <div class="flex justify-between items-end mb-4 border-b border-slate-800 pb-4">
+        <div>
+          <p class="text-xs text-slate-400">總計張數：<span id="photoTotalCount" class="font-bold text-amber-400">0</span> 張 <span id="tierBadge" class="ml-1 px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300">原價算</span></p>
+          <p id="photoTotalTwd" class="text-3xl font-extrabold text-emerald-400">NT$ 0</p>
+        </div>
+        <div class="text-right">
+          <p class="text-xs text-slate-400">估算利潤</p>
+          <p id="photoTotalProfit" class="text-lg font-semibold text-emerald-300">NT$ 0</p>
+        </div>
+      </div>
+      <button onclick="copyQuote(3)" class="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold rounded-xl transition flex items-center justify-center gap-2 mb-4">
+        複製完整報價文字
+      </button>
+
+      <!-- 預覽框 (分頁三) -->
+      <div id="previewBox3" class="hidden border-t border-slate-800 pt-4 mt-2">
+        <p class="text-xs font-semibold text-slate-400 mb-2 flex items-center gap-1">📋 已複製的報價文字預覽：</p>
+        <pre id="previewText3" class="bg-slate-950 p-3.5 rounded-xl text-xs font-mono text-emerald-300 whitespace-pre-wrap break-all border border-slate-800 leading-relaxed"></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 分頁四：純數字商品報價 ==================== -->
+  <div id="tab4" class="tab-content hidden">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
+      <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white font-bold text-xl">📦</div>
+          <div>
+            <h1 class="text-xl font-bold text-slate-800">純數字商品報價</h1>
+            <p class="text-xs text-slate-500">快速輸入日幣數字轉換為台幣報價</p>
+          </div>
+        </div>
+        <button onclick="resetNumberInputs()" class="text-xs text-slate-500 hover:text-red-500 font-semibold underline">重置內容</button>
+      </div>
+
+      <!-- 10個數字輸入欄位 (圖二) -->
+      <div id="numberInputsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+    </div>
+
+    <!-- 數字報價總結 -->
+    <div id="summaryCardNumber" class="bg-slate-900 text-white rounded-2xl p-6 shadow-lg mb-6">
+      <div class="flex justify-between items-end mb-4 border-b border-slate-800 pb-4">
+        <div>
+          <p class="text-xs text-slate-400">總計預估台幣 (已套用 0/5 進位)</p>
+          <p id="numberTotalTwd" class="text-3xl font-extrabold text-emerald-400">NT$ 0</p>
+        </div>
+        <div class="text-right">
+          <p class="text-xs text-slate-400">日幣商品總額</p>
+          <p id="numberTotalJpy" class="text-lg font-semibold">¥0</p>
+        </div>
+      </div>
+      <button onclick="copyQuote(4)" class="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold rounded-xl transition flex items-center justify-center gap-2 mb-4">
+        複製完整報價文字
+      </button>
+
+      <!-- 預覽框 (分頁四) -->
+      <div id="previewBox4" class="hidden border-t border-slate-800 pt-4 mt-2">
+        <p class="text-xs font-semibold text-slate-400 mb-2 flex items-center gap-1">📋 已複製的報價文字預覽：</p>
+        <pre id="previewText4" class="bg-slate-950 p-3.5 rounded-xl text-xs font-mono text-emerald-300 whitespace-pre-wrap break-all border border-slate-800 leading-relaxed"></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 分頁五：系統設定 ==================== -->
+  <div id="tab5" class="tab-content hidden">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
+      <h2 class="text-lg font-bold text-slate-800 mb-4 pb-2 border-b border-slate-100">⚙️ 匯率與費用設定</h2>
+      
+      <div class="space-y-4 mb-6">
+        <!-- 國際即時匯率 -->
+        <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-100 flex items-center justify-between">
+          <div>
+            <p class="text-xs font-semibold text-slate-500">國際即時匯率 (日幣 → 台幣)</p>
+            <p id="realtimeRateDisplay" class="text-sm font-bold text-slate-800 mt-0.5">抓取中...</p>
+          </div>
+          <button onclick="fetchRealtimeRate()" class="text-xs text-red-500 hover:text-red-600 font-semibold underline">重新整理</button>
+        </div>
+
+        <!-- 設定匯率 -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">設定匯率 (手動輸入，預設 0.22)</label>
+          <input type="number" id="rate" value="0.22" step="0.001" oninput="saveAndCalculate()" class="w-full p-2.5 rounded-lg border border-slate-200 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none">
+        </div>
+
+        <!-- 成本計算用匯率 -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">成本結算匯率 (計算相卡利潤用，預設 0.21)</label>
+          <input type="number" id="costRate" value="0.21" step="0.001" oninput="saveAndCalculate()" class="w-full p-2.5 rounded-lg border border-slate-200 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none">
+        </div>
+
+        <!-- 二手代購費率 -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">二手代購費率 (%) (煤爐及二手商品，預設 17.5%)</label>
+          <input type="number" id="usedFeePercent" value="17.5" step="0.1" oninput="saveAndCalculate()" class="w-full p-2.5 rounded-lg border border-slate-200 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none">
+        </div>
+
+        <!-- 通販代購費率 -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">通販代購費率 (%) (新品與各大官網，預設 15%)</label>
+          <input type="number" id="shopFeePercent" value="15" step="0.1" oninput="saveAndCalculate()" class="w-full p-2.5 rounded-lg border border-slate-200 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none">
+        </div>
+      </div>
+
+      <h2 class="text-lg font-bold text-slate-800 mb-4 pb-2 border-b border-slate-100">📝 報價複製範本自訂 (填空預覽格式)</h2>
+
+      <!-- 直覺填空題設計 -->
+      <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 font-mono text-xs text-slate-700 space-y-3">
+        <div>
+          <label class="block text-[11px] font-bold text-red-500 mb-1 font-sans">1. 開頭問候語 (可填空修改)：</label>
+          <textarea id="tplHeader" rows="2" oninput="saveSettingsOnly()" class="w-full p-2.5 rounded-xl border border-red-200 focus:border-red-500 bg-white text-xs font-sans text-slate-800 focus:ring-2 focus:ring-red-500/20 outline-none" placeholder="您好 感謝詢問✨✨&#10;以上物品報價"></textarea>
+        </div>
+
+        <div class="border-b border-dashed border-slate-300 my-2"></div>
+
+        <div class="bg-slate-100 p-3 rounded-xl border border-slate-200 text-slate-400 space-y-1 select-none font-sans">
+          <p class="text-[10px] font-bold text-slate-500">🔒 此處為系統自動生成內容 (無法手動編輯)：</p>
+          <p class="text-xs text-slate-600 font-mono">1. 商品名稱 ($台幣報價金額)</p>
+          <p class="text-xs text-slate-600 font-mono pl-3">https://jp.mercari.com/item/m...</p>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-red-500 mb-1 font-sans">2. 運費說明備註 (可填空修改)：</label>
+          <input type="text" id="tplShippingNote" oninput="saveSettingsOnly()" class="w-full p-2.5 rounded-xl border border-red-200 focus:border-red-500 bg-white text-xs font-sans text-slate-800 focus:ring-2 focus:ring-red-500/20 outline-none" placeholder="(不含國際運費&台灣運費)">
+        </div>
+
+        <div class="border-b border-dashed border-slate-300 my-2"></div>
+
+        <div class="bg-slate-100 p-2.5 rounded-xl border border-slate-200 text-slate-600 select-none font-sans text-xs font-bold">
+          總計金額：NT$ [系統自動計算金額]
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-red-500 mb-1 font-sans">3. 結尾說明/匯款方式 (可填空修改)：</label>
+          <textarea id="tplFooter" rows="2" oninput="saveSettingsOnly()" class="w-full p-2.5 rounded-xl border border-red-200 focus:border-red-500 bg-white text-xs font-sans text-slate-800 focus:ring-2 focus:ring-red-500/20 outline-none" placeholder="匯款方式：線上轉帳、無卡匯款 (需先確認需匯款金額)"></textarea>
+        </div>
+      </div>
+
+      <p class="text-[11px] text-slate-400 mt-4">* 修改後會自動儲存設定，下次開啟網頁無需重複輸入。</p>
+    </div>
+  </div>
+
+  <!-- ==================== 底部固定切換導覽列 ==================== -->
+  <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-2 py-2 flex justify-around items-center z-50">
+    <button onclick="switchTab(1)" id="tabBtn1" class="flex flex-col items-center text-red-500 font-bold">
+      <span class="text-lg">🛒</span>
+      <span class="text-[10px]">煤爐報價</span>
+    </button>
+    <button onclick="switchTab(2)" id="tabBtn2" class="flex flex-col items-center text-slate-400 font-medium">
+      <span class="text-lg">✍️</span>
+      <span class="text-[10px]">通用手輸</span>
+    </button>
+    <button onclick="switchTab(3)" id="tabBtn3" class="flex flex-col items-center text-slate-400 font-medium">
+      <span class="text-lg">📷</span>
+      <span class="text-[10px]">相卡報價</span>
+    </button>
+    <button onclick="switchTab(4)" id="tabBtn4" class="flex flex-col items-center text-slate-400 font-medium">
+      <span class="text-lg">📦</span>
+      <span class="text-[10px]">商品報價</span>
+    </button>
+    <button onclick="switchTab(5)" id="tabBtn5" class="flex flex-col items-center text-slate-400 font-medium">
+      <span class="text-lg">⚙️</span>
+      <span class="text-[10px]">系統設定</span>
+    </button>
+  </div>
+
+  <script>
+    const WORKER_API_URL = "https://mercari-api.910pigshop.workers.dev";
+    let fetchedItems = [];          // 分頁一：煤爐網址商品
+    let generalManualItems = [];    // 分頁二：通用手輸商品
+    let numberItems = Array(10).fill(0); // 分頁四：10個數字商品欄位
+
+    // 相卡定義與三階價格 ($15 / $28 等預設報價)
+    const photoCardDefs = [
+      { id: "lawson_l", name: "Lawson/全家--L判", jpyCost: 30, prices: [15, 14, 13] },
+      { id: "seven_l", name: "7-11--L判", jpyCost: 40, prices: [18, 17, 16] },
+      { id: "lawson_2l", name: "Lawson/全家--2L判", jpyCost: 80, prices: [28, 26, 24] },
+      { id: "seven_2l", name: "7-11--2L判", jpyCost: 100, prices: [33, 31, 29] },
+      { id: "lawson_post", name: "Lawson/全家--明信片", jpyCost: 70, prices: [25, 23, 22] },
+      { id: "seven_post", name: "7-11--明信片", jpyCost: 60, prices: [23, 21, 20] },
+      { id: "custom_g", name: "自定義相卡 G", jpyCost: 0, prices: [0, 0, 0] },
+      { id: "custom_h", name: "自定義相卡 H", jpyCost: 0, prices: [0, 0, 0] },
+      { id: "official_200", name: "官方相卡/貼紙(¥200)", jpyCost: 200, prices: [60, 56, 52] },
+      { id: "official_250", name: "官方相卡/貼紙(¥250)", jpyCost: 250, prices: [75, 70, 65] },
+      { id: "official_300", name: "官方相卡/貼紙(¥300)", jpyCost: 300, prices: [90, 84, 78] },
+      { id: "official_500", name: "官方相卡/貼紙(¥500)", jpyCost: 500, prices: [150, 140, 130] }
+    ];
+    let photoCardCounts = Array(photoCardDefs.length).fill(0);
+
+    // 預設報價範本
+    const DEFAULT_HEADER = "您好 感謝詢問✨✨\n以上物品報價";
+    const DEFAULT_SHIPPING = "(不含國際運費&台灣運費)";
+    const DEFAULT_FOOTER = "匯款方式：線上轉帳、無卡匯款 (需先確認需匯款金額)";
+
+    // 初始化
+    window.addEventListener("DOMContentLoaded", () => {
+      loadSettings();
+      fetchRealtimeRate();
+      addGeneralManualItem();
+      renderPhotoCardGrid();
+      renderNumberInputsGrid();
+    });
+
+    // 分頁切換邏輯
+    function switchTab(tabNum) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.getElementById(`tab${tabNum}`).classList.remove('hidden');
+
+      for (let i = 1; i <= 5; i++) {
+        const btn = document.getElementById(`tabBtn${i}`);
+        if (i === tabNum) {
+          btn.className = "flex flex-col items-center text-red-500 font-bold";
+        } else {
+          btn.className = "flex flex-col items-center text-slate-400 font-medium";
+        }
+      }
+    }
+
+    // 載入與儲存記憶
+    function loadSettings() {
+      const savedRate = localStorage.getItem("mercari_rate");
+      const savedCostRate = localStorage.getItem("mercari_cost_rate");
+      const savedUsedFee = localStorage.getItem("mercari_used_fee");
+      const savedShopFee = localStorage.getItem("mercari_shop_fee");
+      const savedHeader = localStorage.getItem("mercari_tpl_header");
+      const savedShipping = localStorage.getItem("mercari_tpl_shipping");
+      const savedFooter = localStorage.getItem("mercari_tpl_footer");
+
+      if (savedRate !== null) document.getElementById("rate").value = savedRate;
+      if (savedCostRate !== null) document.getElementById("costRate").value = savedCostRate;
+      if (savedUsedFee !== null) document.getElementById("usedFeePercent").value = savedUsedFee;
+      if (savedShopFee !== null) document.getElementById("shopFeePercent").value = savedShopFee;
+      
+      document.getElementById("tplHeader").value = savedHeader !== null ? savedHeader : DEFAULT_HEADER;
+      document.getElementById("tplShippingNote").value = savedShipping !== null ? savedShipping : DEFAULT_SHIPPING;
+      document.getElementById("tplFooter").value = savedFooter !== null ? savedFooter : DEFAULT_FOOTER;
+    }
+
+    function saveSettingsOnly() {
+      localStorage.setItem("mercari_rate", document.getElementById("rate").value);
+      localStorage.setItem("mercari_cost_rate", document.getElementById("costRate").value);
+      localStorage.setItem("mercari_used_fee", document.getElementById("usedFeePercent").value);
+      localStorage.setItem("mercari_shop_fee", document.getElementById("shopFeePercent").value);
+      localStorage.setItem("mercari_tpl_header", document.getElementById("tplHeader").value);
+      localStorage.setItem("mercari_tpl_shipping", document.getElementById("tplShippingNote").value);
+      localStorage.setItem("mercari_tpl_footer", document.getElementById("tplFooter").value);
+    }
+
+    function saveAndCalculate() {
+      saveSettingsOnly();
+      renderItems();
+      renderGeneralManualItems();
+      calculateTotal();
+      calculateGeneralTotal();
+      calculatePhotoCards();
+      calculateNumberTotal();
+    }
+
+    // 抓取當天國際即時匯率
+    async function fetchRealtimeRate() {
+      const display = document.getElementById("realtimeRateDisplay");
+      display.innerText = "讀取中...";
+      try {
+        const res = await fetch("https://open.er-api.com/v6/latest/JPY");
+        if (res.ok) {
+          const data = await res.json();
+          const twdRate = data?.rates?.TWD;
+          if (twdRate) {
+            display.innerText = `1 JPY ≈ ${twdRate.toFixed(4)} TWD`;
+            return;
+          }
+        }
+        display.innerText = "無法取得即時匯率";
+      } catch (e) {
+        display.innerText = "無法取得即時匯率";
+      }
+    }
+
+    // 0/5 進位邏輯
+    function adjustRoundPrice(val) {
+      let rounded = Math.round(val);
+      let lastDigit = rounded % 10;
+
+      if (lastDigit >= 1 && lastDigit <= 4) {
+        return rounded + (5 - lastDigit);
+      } else if (lastDigit >= 6 && lastDigit <= 9) {
+        return rounded + (10 - lastDigit);
+      }
+      return rounded;
+    }
+
+    // 計算單件台幣金額
+    function calculateSingleTwd(jpyPrice, type = 'used') {
+      if (!jpyPrice || jpyPrice <= 0) return 0;
+      const rate = parseFloat(document.getElementById("rate").value) || 0;
+      const feePercent = type === 'shop' 
+        ? (parseFloat(document.getElementById("shopFeePercent").value) || 0)
+        : (parseFloat(document.getElementById("usedFeePercent").value) || 0);
+
+      const rawTwd = jpyPrice * rate * (1 + feePercent / 100);
+      return adjustRoundPrice(rawTwd);
+    }
+
+    /* ==================== 分頁一：煤爐邏輯 ==================== */
+    function clearMercariTab() {
+      document.getElementById("urlInput").value = "";
+      fetchedItems = [];
+      document.getElementById("resultsList").innerHTML = "";
+      document.getElementById("summaryCard").classList.add("hidden");
+      document.getElementById("previewBox1").classList.add("hidden");
+    }
+
+    async function fetchPrices() {
+      const rawText = document.getElementById("urlInput").value.trim();
+      const urlMatches = rawText.match(/https?:\/\/[^\s\n]*mercari\.com[^\s\n]*/gi);
+
+      if (!urlMatches || urlMatches.length === 0) {
+        alert("文字中未偵測到有效的 Mercari 商品網址！");
+        return;
+      }
+
+      const urls = [...new Set(urlMatches.map(u => u.trim()))];
+      const fetchBtn = document.getElementById("fetchBtn");
+      fetchBtn.disabled = true;
+      fetchBtn.innerHTML = `<span>已識別 ${urls.length} 個網址，解析中...</span>`;
+
+      try {
+        const response = await fetch(WORKER_API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ urls })
+        });
+
+        const result = await response.json();
+        if (result.success) {
+          fetchedItems = result.data;
+          renderItems();
+          calculateTotal();
+        } else {
+          alert("自動抓取失敗：" + (result.error || "伺服器無回應"));
+        }
+      } catch (err) {
+        alert("連線失敗，請檢查網路。");
+      } finally {
+        fetchBtn.disabled = false;
+        fetchBtn.innerHTML = `<span>自動辨識網址並報價</span>`;
+      }
+    }
+
+    function editItemPrice(index) {
+      const currentPrice = fetchedItems[index].price || 0;
+      const input = prompt("請輸入修改後的日幣金額:", currentPrice);
+      if (input === null) return;
+
+      const newPrice = parseInt(input, 10);
+      if (!isNaN(newPrice) && newPrice >= 0) {
+        fetchedItems[index].price = newPrice;
+        fetchedItems[index].isManual = true;
+        renderItems();
+        calculateTotal();
+      } else {
+        alert("請輸入有效的數字！");
+      }
+    }
+
+    function renderItems() {
+      const list = document.getElementById("resultsList");
+      list.innerHTML = "";
+
+      fetchedItems.forEach((item, index) => {
+        const card = document.createElement("div");
+        card.className = "bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative";
+
+        if (!item.success) {
+          const singleTwd = calculateSingleTwd(item.price, 'used');
+          
+          card.innerHTML = `
+            <div class="mb-2">
+              <span class="inline-block bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-1 rounded-md">⚠️ 請手動確認商品金額及內容</span>
+            </div>
+            <p class="text-xs text-slate-500 mb-3 truncate">原網址: <a href="${item.originalUrl || item.url}" target="_blank" class="text-red-500 hover:underline">${item.originalUrl || item.url}</a></p>
+            
+            <div class="space-y-3">
+              <div class="flex items-center gap-3">
+                <label class="text-xs font-semibold text-slate-700 whitespace-nowrap min-w-[120px]">手動商品名稱:</label>
+                <input type="text" value="${item.manualTitle || ''}" placeholder="例如：日版商品名稱 / 自訂名稱" oninput="updateManualTitle(${index}, this.value)" class="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 text-slate-800">
+              </div>
+
+              <div class="flex items-center gap-3">
+                <label class="text-xs font-semibold text-slate-700 whitespace-nowrap min-w-[120px]">手動填寫日幣價格:</label>
+                <div class="relative flex-1">
+                  <span class="absolute left-3 top-2.5 text-slate-400 text-sm">¥</span>
+                  <input type="number" value="${item.price || ''}" placeholder="輸入金額" oninput="updateManualPrice(${index}, this.value)" class="w-full pl-7 pr-3 py-2 text-sm font-bold rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 text-slate-800">
+                </div>
+              </div>
+
+              <div class="flex items-center gap-3">
+                <label class="text-xs font-semibold text-slate-700 whitespace-nowrap min-w-[120px]">手動日本頁面網址:</label>
+                <input type="url" value="${item.manualJpUrl || ''}" placeholder="https://jp.mercari.com/item/m..." oninput="updateManualUrl(${index}, this.value)" class="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 text-slate-800">
+              </div>
+
+              <div class="flex justify-between items-center text-sm pt-2 border-t border-slate-100">
+                <span class="text-slate-500 text-xs font-semibold">預估台幣金額:</span>
+                <span class="font-bold text-emerald-600 text-base single-twd-display">NT$ ${singleTwd.toLocaleString()}</span>
+              </div>
+            </div>
+          `;
+        } else {
+          const twBadge = item.isTaiwanUrl 
+            ? `<span class="inline-block bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-1 rounded-md mb-2 mr-2">🇹🇼 台灣煤爐網址轉換</span>` 
+            : ``;
+
+          const warningBadge = item.isChakubarai 
+            ? `<span class="inline-block bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-1 rounded-md mb-2">⚠️ 不含送料 (着払い / 買家負擔運費)</span>` 
+            : `<span class="inline-block bg-emerald-100 text-emerald-800 text-xs font-bold px-2.5 py-1 rounded-md mb-2">✅ 送料込み (賣家負擔運費)</span>`;
+
+          const singleTwd = calculateSingleTwd(item.price, 'used');
+          const displayJpUrl = item.manualJpUrl || item.jpUrl || item.originalUrl || item.url;
+
+          card.innerHTML = `
+            <div>
+              ${twBadge}${warningBadge}
+            </div>
+            <h3 class="text-sm font-semibold text-slate-800 mb-2 line-clamp-2">${item.title}</h3>
+            
+            <div class="space-y-1.5 mb-3">
+              <div class="flex justify-between items-center text-sm">
+                <span class="text-slate-500">日幣價格:</span>
+                <div class="flex items-center gap-2">
+                  <span class="font-bold text-slate-900 text-base">¥${(item.price || 0).toLocaleString()}</span>
+                  <button onclick="editItemPrice(${index})" class="text-[11px] text-red-500 hover:text-red-600 bg-red-50 px-2 py-0.5 rounded font-medium border border-red-100 transition">手動修改</button>
+                </div>
+              </div>
+              <div class="flex justify-between items-center text-sm">
+                <span class="text-slate-500">預估台幣:</span>
+                <span class="font-bold text-emerald-600 text-base">NT$ ${singleTwd.toLocaleString()}</span>
+              </div>
+            </div>
+
+            <div class="border-t border-slate-100 pt-3 flex items-center justify-between text-xs text-slate-500">
+              <span>日本頁面網址:</span>
+              <a href="${displayJpUrl}" target="_blank" class="text-red-500 hover:text-red-600 font-medium truncate max-w-[300px] hover:underline">${displayJpUrl}</a>
+            </div>
+          `;
+        }
+        list.appendChild(card);
+      });
+
+      document.getElementById("summaryCard").classList.remove("hidden");
+    }
+
+    function updateManualTitle(index, val) {
+      fetchedItems[index].manualTitle = val.trim();
+    }
+
+    function updateManualPrice(index, val) {
+      const price = parseInt(val, 10);
+      fetchedItems[index].price = (!isNaN(price) && price >= 0) ? price : 0;
+      calculateTotal();
+      
+      const singleTwdEl = document.querySelectorAll("#resultsList > div")[index]?.querySelector(".single-twd-display");
+      if (singleTwdEl) {
+        const singleTwd = calculateSingleTwd(fetchedItems[index].price, 'used');
+        singleTwdEl.innerText = `NT$ ${singleTwd.toLocaleString()}`;
+      }
+    }
+
+    function updateManualUrl(index, val) {
+      fetchedItems[index].manualJpUrl = val.trim();
+    }
+
+    function calculateTotal() {
+      let totalJpy = 0;
+      let totalTwdSum = 0;
+
+      fetchedItems.forEach(item => {
+        if (item.price && item.price > 0) {
+          totalJpy += item.price;
+          totalTwdSum += calculateSingleTwd(item.price, 'used');
+        }
+      });
+
+      document.getElementById("totalJpy").innerText = `¥${totalJpy.toLocaleString()}`;
+      document.getElementById("totalTwd").innerText = `NT$ ${totalTwdSum.toLocaleString()}`;
+    }
+
+
+    /* ==================== 分頁二：通用手輸邏輯 ==================== */
+    function clearGeneralTab() {
+      generalManualItems = [];
+      addGeneralManualItem();
+      document.getElementById("previewBox2").classList.add("hidden");
+    }
+
+    function addGeneralManualItem() {
+      generalManualItems.push({ title: "", price: 0, type: "shop", url: "" });
+      renderGeneralManualItems();
+      calculateGeneralTotal();
+    }
+
+    function removeGeneralManualItem(index) {
+      generalManualItems.splice(index, 1);
+      renderGeneralManualItems();
+      calculateGeneralTotal();
+    }
+
+    function setGeneralItemType(index, type) {
+      generalManualItems[index].type = type;
+      renderGeneralManualItems();
+      calculateGeneralTotal();
+    }
+
+    function updateGeneralTitle(index, val) {
+      generalManualItems[index].title = val.trim();
+    }
+
+    function updateGeneralPrice(index, val) {
+      const price = parseInt(val, 10);
+      generalManualItems[index].price = (!isNaN(price) && price >= 0) ? price : 0;
+      calculateGeneralTotal();
+
+      const singleTwdEl = document.querySelectorAll("#generalManualList > div")[index]?.querySelector(".general-single-twd");
+      if (singleTwdEl) {
+        const singleTwd = calculateSingleTwd(generalManualItems[index].price, generalManualItems[index].type);
+        singleTwdEl.innerText = `NT$ ${singleTwd.toLocaleString()}`;
+      }
+    }
+
+    function updateGeneralUrl(index, val) {
+      generalManualItems[index].url = val.trim();
+    }
+
+    function renderGeneralManualItems() {
+      const list = document.getElementById("generalManualList");
+      list.innerHTML = "";
+
+      generalManualItems.forEach((item, index) => {
+        const card = document.createElement("div");
+        card.className = "bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative space-y-3";
+
+        const singleTwd = calculateSingleTwd(item.price, item.type);
+
+        const shopActiveBtn = item.type === 'shop' ? `bg-blue-500 text-white font-bold shadow-sm` : `bg-slate-100 text-slate-600 hover:bg-slate-200`;
+        const usedActiveBtn = item.type === 'used' ? `bg-amber-500 text-white font-bold shadow-sm` : `bg-slate-100 text-slate-600 hover:bg-slate-200`;
+
+        card.innerHTML = `
+          <div class="flex justify-between items-center pb-2 border-b border-slate-100">
+            <span class="text-xs font-bold text-slate-700">商品 #${index + 1}</span>
+            <div class="flex items-center gap-2">
+              <div class="flex bg-slate-100 p-0.5 rounded-lg text-xs">
+                <button onclick="setGeneralItemType(${index}, 'shop')" class="px-2.5 py-1 rounded-md transition ${shopActiveBtn}">🛍️ 通販/新品</button>
+                <button onclick="setGeneralItemType(${index}, 'used')" class="px-2.5 py-1 rounded-md transition ${usedActiveBtn}">♻️ 二手商品</button>
+              </div>
+              ${generalManualItems.length > 1 ? `
+                <button onclick="removeGeneralManualItem(${index})" class="text-xs text-red-500 hover:text-red-700 font-bold px-2 py-1 bg-red-50 rounded-md">刪除</button>
+              ` : ''}
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <label class="text-xs font-semibold text-slate-700 whitespace-nowrap min-w-[100px]">商品名稱:</label>
+            <input type="text" value="${item.title}" placeholder="輸入商品名稱" oninput="updateGeneralTitle(${index}, this.value)" class="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800">
+          </div>
+
+          <div class="flex items-center gap-3">
+            <label class="text-xs font-semibold text-slate-700 whitespace-nowrap min-w-[100px]">日幣價格:</label>
+            <div class="relative flex-1">
+              <span class="absolute left-3 top-2.5 text-slate-400 text-sm">¥</span>
+              <input type="number" value="${item.price || ''}" placeholder="輸入日幣金額" oninput="updateGeneralPrice(${index}, this.value)" class="w-full pl-7 pr-3 py-2 text-sm font-bold rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800">
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <label class="text-xs font-semibold text-slate-700 whitespace-nowrap min-w-[100px]">商品頁面網址:</label>
+            <input type="url" value="${item.url}" placeholder="https://..." oninput="updateGeneralUrl(${index}, this.value)" class="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800">
+          </div>
+
+          <div class="flex justify-between items-center text-sm pt-2 border-t border-slate-100">
+            <span class="text-slate-500 text-xs font-semibold">預估台幣金額 (${item.type === 'shop' ? '通販費率' : '二手費率'}):</span>
+            <span class="font-bold text-emerald-600 text-base general-single-twd">NT$ ${singleTwd.toLocaleString()}</span>
+          </div>
+        `;
+
+        list.appendChild(card);
+      });
+
+      document.getElementById("summaryCardGeneral").classList.remove("hidden");
+    }
+
+    function calculateGeneralTotal() {
+      let totalJpy = 0;
+      let totalTwdSum = 0;
+
+      generalManualItems.forEach(item => {
+        if (item.price && item.price > 0) {
+          totalJpy += item.price;
+          totalTwdSum += calculateSingleTwd(item.price, item.type);
+        }
+      });
+
+      document.getElementById("totalJpyGeneral").innerText = `¥${totalJpy.toLocaleString()}`;
+      document.getElementById("totalTwdGeneral").innerText = `NT$ ${totalTwdSum.toLocaleString()}`;
+    }
+
+
+    /* ==================== 分頁三：相卡報價邏輯 ==================== */
+    function renderPhotoCardGrid() {
+      const grid = document.getElementById("photoCardGrid");
+      grid.innerHTML = "";
+
+      photoCardDefs.forEach((def, index) => {
+        const card = document.createElement("div");
+        card.className = "bg-slate-50 rounded-xl p-3.5 border border-slate-200 flex items-center justify-between";
+
+        const count = photoCardCounts[index] || 0;
+        const currentTierIndex = getTierIndex();
+        const unitPrice = def.prices[currentTierIndex];
+
+        card.innerHTML = `
+          <div>
+            <p class="text-xs font-bold text-slate-800">${def.name}</p>
+            <p class="text-xs font-bold text-blue-600 mt-0.5">$${unitPrice}</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="changePhotoCardCount(${index}, -1)" class="w-8 h-8 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-700 font-bold flex items-center justify-center text-lg shadow-sm">-</button>
+            <input type="number" value="${count}" min="0" onchange="setPhotoCardCount(${index}, this.value)" class="w-12 text-center py-1 text-sm font-bold rounded-lg border border-slate-300 focus:outline-none">
+            <button onclick="changePhotoCardCount(${index}, 1)" class="w-8 h-8 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-bold flex items-center justify-center text-lg shadow-sm">+</button>
+          </div>
+        `;
+
+        grid.appendChild(card);
+      });
+
+      calculatePhotoCards();
+    }
+
+    function changePhotoCardCount(index, delta) {
+      photoCardCounts[index] = Math.max(0, (photoCardCounts[index] || 0) + delta);
+      renderPhotoCardGrid();
+    }
+
+    function setPhotoCardCount(index, val) {
+      const num = parseInt(val, 10);
+      photoCardCounts[index] = !isNaN(num) && num >= 0 ? num : 0;
+      renderPhotoCardGrid();
+    }
+
+    function resetPhotoCardCounts() {
+      photoCardCounts = Array(photoCardDefs.length).fill(0);
+      renderPhotoCardGrid();
+    }
+
+    // 計算大宗折扣階梯 (總張數 >= 50 階梯2 | >= 25 階梯1 | 否則階梯0)
+    function getTierIndex() {
+      const totalCount = photoCardCounts.reduce((a, b) => a + b, 0);
+      if (totalCount >= 50) return 2;
+      if (totalCount >= 25) return 1;
+      return 0;
+    }
+
+    function calculatePhotoCards() {
+      const totalCount = photoCardCounts.reduce((a, b) => a + b, 0);
+      const tierIdx = getTierIndex();
+
+      let totalTwd = 0;
+      let totalProfit = 0;
+      const costRate = parseFloat(document.getElementById("costRate").value) || 0.21;
+
+      photoCardDefs.forEach((def, index) => {
+        const count = photoCardCounts[index] || 0;
+        if (count > 0) {
+          const unitPrice = def.prices[tierIdx];
+          const itemTwd = count * unitPrice;
+          totalTwd += itemTwd;
+
+          // 相卡利潤公式：相卡報價 - (成本匯率 * 日幣成本 * 張數)
+          const itemCost = costRate * def.jpyCost * count;
+          totalProfit += (itemTwd - itemCost);
+        }
+      });
+
+      // 小數點進1並取整數
+      totalTwd = Math.ceil(totalTwd);
+      totalProfit = Math.ceil(totalProfit);
+
+      document.getElementById("photoTotalCount").innerText = totalCount;
+      document.getElementById("photoTotalTwd").innerText = `NT$ ${totalTwd.toLocaleString()}`;
+      document.getElementById("photoTotalProfit").innerText = `NT$ ${totalProfit.toLocaleString()}`;
+
+      const badge = document.getElementById("tierBadge");
+      if (tierIdx === 2) {
+        badge.innerText = "🔥 50+張特價";
+        badge.className = "ml-1 px-2 py-0.5 rounded text-[10px] bg-red-500 text-white font-bold";
+      } else if (tierIdx === 1) {
+        badge.innerText = "✨ 25+張特價";
+        badge.className = "ml-1 px-2 py-0.5 rounded text-[10px] bg-amber-500 text-white font-bold";
+      } else {
+        badge.innerText = "原價算";
+        badge.className = "ml-1 px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300";
+      }
+    }
+
+
+    /* ==================== 分頁四：純數字商品報價 ==================== */
+    function renderNumberInputsGrid() {
+      const grid = document.getElementById("numberInputsGrid");
+      grid.innerHTML = "";
+
+      numberItems.forEach((val, index) => {
+        const card = document.createElement("div");
+        card.className = "bg-white p-3.5 rounded-xl border border-slate-200 flex items-center justify-between";
+
+        const singleTwd = calculateSingleTwd(val, 'used');
+
+        card.innerHTML = `
+          <span class="text-xs font-bold text-slate-400 w-6">${index + 1}.</span>
+          <div class="relative flex-1 mr-3">
+            <span class="absolute left-3 top-2 text-slate-400 text-xs">¥</span>
+            <input type="number" value="${val || ''}" placeholder="輸入日幣金額" oninput="updateNumberItem(${index}, this.value)" class="w-full pl-7 pr-3 py-1.5 text-xs font-bold rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-800">
+          </div>
+          <span class="text-xs font-bold text-emerald-600 whitespace-nowrap min-w-[70px] text-right">NT$ ${singleTwd.toLocaleString()}</span>
+        `;
+        grid.appendChild(card);
+      });
+
+      calculateNumberTotal();
+    }
+
+    function updateNumberItem(index, val) {
+      const num = parseInt(val, 10);
+      numberItems[index] = !isNaN(num) && num >= 0 ? num : 0;
+      calculateNumberTotal();
+
+      const singleTwdEl = document.querySelectorAll("#numberInputsGrid > div")[index]?.querySelector(".text-emerald-600");
+      if (singleTwdEl) {
+        const singleTwd = calculateSingleTwd(numberItems[index], 'used');
+        singleTwdEl.innerText = `NT$ ${singleTwd.toLocaleString()}`;
+      }
+    }
+
+    function resetNumberInputs() {
+      numberItems = Array(10).fill(0);
+      renderNumberInputsGrid();
+      document.getElementById("previewBox4").classList.add("hidden");
+    }
+
+    function calculateNumberTotal() {
+      let totalJpy = 0;
+      let totalTwd = 0;
+
+      numberItems.forEach(val => {
+        if (val > 0) {
+          totalJpy += val;
+          totalTwd += calculateSingleTwd(val, 'used');
+        }
+      });
+
+      document.getElementById("numberTotalJpy").innerText = `¥${totalJpy.toLocaleString()}`;
+      document.getElementById("numberTotalTwd").innerText = `NT$ ${totalTwd.toLocaleString()}`;
+    }
+
+
+    /* ==================== 複製報價與預覽邏輯 ==================== */
+    function copyQuote(tabSource) {
+      const headerText = document.getElementById("tplHeader").value.trim();
+      const shippingNote = document.getElementById("tplShippingNote").value.trim();
+      const footerText = document.getElementById("tplFooter").value.trim();
+      
+      let text = "";
+
+      if (headerText) {
+        text += `${headerText}\n--------------------\n`;
+      }
+
+      let validCount = 0;
+
+      if (tabSource === 1 || tabSource === 2) {
+        const targetItems = tabSource === 1 ? fetchedItems : generalManualItems;
+        const totalTwdVal = document.getElementById(tabSource === 1 ? "totalTwd" : "totalTwdGeneral").innerText.replace("NT$", "").trim();
+
+        targetItems.forEach((item, i) => {
+          const itemPrice = item.price || 0;
+          const itemType = item.type || 'used';
+
+          if (tabSource === 1 ? (item.success || itemPrice > 0) : (itemPrice > 0)) {
+            validCount++;
+            const title = item.manualTitle || item.title || `商品 (${i + 1})`;
+            const rawUrl = item.manualJpUrl || item.jpUrl || item.originalUrl || item.url || "";
+            const displayUrl = rawUrl.trim();
+            const singleTwd = calculateSingleTwd(itemPrice, itemType);
+
+            text += `${validCount}. ${title} ($${singleTwd.toLocaleString()})\n`;
+            if (displayUrl !== "") {
+              text += `   ${displayUrl}\n`;
+            }
+          }
+        });
+
+        if (shippingNote) text += `${shippingNote}\n`;
+        text += `--------------------\n`;
+        text += `總計金額：NT$ ${totalTwdVal}\n`;
+      } else if (tabSource === 3) {
+        // 相卡報價複製
+        const tierIdx = getTierIndex();
+        photoCardDefs.forEach((def, index) => {
+          const count = photoCardCounts[index] || 0;
+          if (count > 0) {
+            validCount++;
+            const unitPrice = def.prices[tierIdx];
+            const itemTwd = count * unitPrice;
+            text += `${validCount}. ${def.name} x${count} ($${itemTwd.toLocaleString()})\n`;
+          }
+        });
+
+        if (shippingNote) text += `${shippingNote}\n`;
+        text += `--------------------\n`;
+        const photoTotalTwd = document.getElementById("photoTotalTwd").innerText.replace("NT$", "").trim();
+        text += `總計金額：NT$ ${photoTotalTwd}\n`;
+      } else if (tabSource === 4) {
+        // 純數字商品複製
+        numberItems.forEach((val, index) => {
+          if (val > 0) {
+            validCount++;
+            const singleTwd = calculateSingleTwd(val, 'used');
+            text += `${validCount}. 商品 (${index + 1}) ($${singleTwd.toLocaleString()})\n`;
+          }
+        });
+
+        if (shippingNote) text += `${shippingNote}\n`;
+        text += `--------------------\n`;
+        const numberTotalTwd = document.getElementById("numberTotalTwd").innerText.replace("NT$", "").trim();
+        text += `總計金額：NT$ ${numberTotalTwd}\n`;
+      }
+
+      if (footerText) {
+        text += `${footerText}`;
+      }
+
+      navigator.clipboard.writeText(text).then(() => {
+        document.getElementById(`previewText${tabSource}`).innerText = text;
+        document.getElementById(`previewBox${tabSource}`).classList.remove("hidden");
+        alert("報價文字已成功複製到剪貼簿！");
+      });
+    }
+  </script>
+</body>
+</html>
